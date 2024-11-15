@@ -67,10 +67,38 @@ def create_and_encrypt_prescription(prescription, doctor_private_key, pharmacy_p
 
     return encrypted_prescription, signature
 
-#Input
-prescription_text = input("\nEnter the prescription text: ")
+def decrypt_and_verify_prescription(encrypted_prescription, signature, pharmacy_private_key, doctor_public_key):
+    # Decrypt the prescription
+    decrypted_prescription = pharmacy_private_key.decrypt(
+        encrypted_prescription,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    ).decode("utf-8")
+
+    try:
+        doctor_public_key.verify(
+            signature,
+            decrypted_prescription.encode("utf-8"),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        print("Prescription verified. The prescription is authentic.")
+    except Exception as e:
+        print("Signature verification failed: The prescription has been tampered with.")
+        print(f"Error: {e}")
+
+    return decrypted_prescription
 
 display_keys()
+
+#Input
+prescription_text = input("\nEnter the prescription text: ")
 
 encrypted_prescription, signature = create_and_encrypt_prescription(
     prescription_text, doctor_private_key, pharmacy_public_key
@@ -81,5 +109,13 @@ with open("encrypted_prescription.bin", "wb") as enc_file:
 print("\nPrescription encrypted and signed by the doctor.")
 print("Encrypted prescription saved to 'encrypted_prescription.bin'.")
 
+# Pharmacy decrypts and verifies 
+decrypted_prescription = decrypt_and_verify_prescription(
+    encrypted_prescription, signature, pharmacy_private_key, doctor_public_key
+)
 
-
+# Save decrypted prescription to a file
+with open("decrypted_prescription.txt", "w") as dec_file:
+    dec_file.write(decrypted_prescription)
+print("\nDecrypted Prescription:", decrypted_prescription)
+print("Decrypted prescription saved to 'decrypted_prescription.txt'.")
